@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IoT-Lab — Flood Monitoring Dashboard</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#08111f;color:#e5e7eb}
+.wrap{max-width:1200px;margin:auto;padding:20px}
+header{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}
+h1{margin:0;font-size:28px}.muted{color:#94a3b8;font-size:13px}
+.panel{background:#101a2b;border:1px solid #26364d;border-radius:14px;padding:16px;margin:14px 0}
+input{width:100%;padding:10px 12px;border:1px solid #334155;border-radius:8px;background:#0b1424;color:#fff}
+button{padding:10px 15px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#2563eb;color:#fff;margin-top:9px}
+.led{display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:7px;vertical-align:middle}
+.led.green{background:#22c55e;box-shadow:0 0 8px #22c55e;animation:blinkGreen 1s infinite}
+.led.red{background:#ef4444;box-shadow:0 0 10px #ef4444;animation:blinkRed .6s infinite}.led.gray{background:#64748b;box-shadow:none;animation:none}
+.station-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.station-state{font-size:12px;font-weight:800;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.station-state.normal{background:#14532d;color:#bbf7d0}.station-state.alert{background:#7f1d1d;color:#fecaca}
+@keyframes blinkGreen{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes blinkRed{0%,100%{opacity:1}50%{opacity:.25}}
+.btn-danger{background:#fff1e6;color:#b91c1c;border:2px solid #dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.08);user-select:none;touch-action:none}
+.btn-danger.long-pressing{background:#dc2626;color:#fff;box-shadow:0 0 18px rgba(239,68,68,.85),0 0 45px rgba(239,68,68,.55);border-color:#ff0000}
+body.emergency-active::after{content:"";position:fixed;inset:0;border:0;pointer-events:none;z-index:99999}
+.station.emergency-active{border-color:#ef4444!important;box-shadow:0 0 22px rgba(239,68,68,.75),inset 0 0 28px rgba(239,68,68,.18);animation:stationEmergencyPulse .55s infinite alternate}
+.station.emergency-active .station-state{background:#7f1d1d;color:#fff}
+.btn-reset{background:#ecfdf5;color:#15803d;border:2px solid #22c55e;box-shadow:0 0 0 1px rgba(34,197,94,.08);user-select:none}
+.btn-reset.resetting{background:#22c55e;color:#fff;box-shadow:0 0 18px rgba(34,197,94,.85),0 0 40px rgba(34,197,94,.45);border-color:#16a34a;animation:resetGreenPulse .45s infinite alternate}
+@keyframes stationEmergencyPulse{from{box-shadow:0 0 12px rgba(239,68,68,.45),inset 0 0 12px rgba(239,68,68,.1)}to{box-shadow:0 0 34px rgba(239,68,68,1),inset 0 0 35px rgba(239,68,68,.28)}}
+@keyframes resetGreenPulse{from{box-shadow:0 0 8px rgba(34,197,94,.35)}to{box-shadow:0 0 32px rgba(34,197,94,1)}}
+.threshold-toggle{background:#1e293b;border:1px solid #64748b;color:#e5e7eb;margin-bottom:0}
+.threshold-panel{display:none}.threshold-panel.open{display:block}
+.threshold-help{margin:0 0 12px}.btn-warn{background:#d97706}.btn-dark{background:#475569}.btn-success{background:#16a34a}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.controls button{margin-top:0}.emergency-all{background:#fff1e6;color:#b91c1c;border:2px solid #dc2626;font-size:16px;width:100%;box-shadow:0 2px 8px rgba(220,38,38,.12)}
+.threshold-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.threshold-card{background:#0d1727;border:1px solid #2a3a52;border-radius:10px;padding:12px}
+.threshold-card input{margin-bottom:8px}
+.command-status{margin-top:8px;font-size:12px;color:#94a3b8}
+.command-status.pending{color:#fbbf24}.command-status.sent{color:#fb923c}.command-status.executed{color:#22c55e}.command-status.error{color:#f87171}
+@media(max-width:900px){.threshold-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.threshold-grid{grid-template-columns:1fr}}
+.status{display:flex;align-items:center;gap:8px}.dot{width:10px;height:10px;border-radius:50%;background:#64748b}.ok{background:#22c55e}.bad{background:#ef4444}
+.station-connection{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px}
+.connection-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.connection-dot.online{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.8)}
+.connection-dot.unstable{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.8)}
+.connection-dot.offline{background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,.8);animation:offlineBlink 1.2s infinite}
+.connection-label.online{color:#4ade80}
+@keyframes offlineBlink{0%,100%{opacity:1}50%{opacity:.25}}
+/* Khi ESP32 OFFLINE: chỉ báo kết nối nhấp nháy đỏ.
+   Các hiệu ứng cảnh báo dữ liệu/emergency được làm mờ để tránh hiểu nhầm
+   rằng cảm biến vẫn đang phát hiện cảnh báo khi không còn dữ liệu mới. */
+.station[data-connection-state="OFFLINE"] .led.green,
+.station[data-connection-state="OFFLINE"] .led.red{
+  animation:none !important;
+  opacity:.28 !important;
+  box-shadow:none !important;
+}
+.station[data-connection-state="OFFLINE"] .station-state{
+  opacity:.45;
+}
+.station[data-connection-state="OFFLINE"] .metric{
+  opacity:.48;
+}
+.station[data-connection-state="OFFLINE"] .btn-danger,
+.station[data-connection-state="OFFLINE"] .btn-reset{
+  opacity:.65;
+}
+.station[data-connection-state="OFFLINE"].emergency-active{
+  animation:none !important;
+  box-shadow:0 0 8px rgba(239,68,68,.25)!important;
+}
+
+.connection-label.unstable{color:#fbbf24}
+.connection-label.offline{color:#f87171}
+.station-heartbeat-age{color:#94a3b8;margin-left:4px}
+
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.station{background:#0d1727;border:1px solid #2a3a52;border-radius:12px;padding:14px}
+.station.warn{border-color:#f59e0b}.station.crit{border-color:#ef4444}
+.station h2{margin:0 0 5px;font-size:19px}.zone{color:#94a3b8;font-size:12px}
+.big{font-size:31px;font-weight:800;margin:13px 0 2px}.unit{color:#94a3b8;font-size:12px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}
+.metric{background:#101d31;border-radius:8px;padding:8px}.metric small{color:#94a3b8}.metric b{display:block;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid #26364d}
+canvas{width:100%;height:260px;background:#0b1424;border-radius:10px}
+label{display:block;margin-bottom:6px;font-size:13px}
+@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.wrap{padding:12px}h1{font-size:22px}}
+
+
+.top-tools{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.tool-btn{margin-top:0;background:#1e293b;border:1px solid #475569}
+.modal{display:none;position:fixed;inset:0;background:rgba(2,6,23,.72);backdrop-filter:blur(4px);z-index:10000;padding:20px;overflow:auto}
+.modal.open{display:flex;align-items:center;justify-content:center}
+.modal-box{position:relative;width:min(560px,100%);max-height:90vh;overflow:auto;background:#101a2b;border:1px solid #334155;border-radius:16px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal-wide{width:min(1100px,100%)}
+.modal-close{position:absolute;right:12px;top:10px;margin:0;background:#334155;color:#fff;border-radius:50%;width:34px;height:34px;padding:0}
+.modal-actions{display:flex;gap:8px}.modal-actions button{flex:1}
+.note{margin-top:12px;padding:10px;background:#0b1424;border-radius:8px}
+.status-help{font-size:15px;line-height:1.8}.modal-box hr{border:0;border-top:1px solid #26364d;margin:18px 0}
+@media(max-width:600px){.top-tools{display:grid;grid-template-columns:1fr 1fr 1fr}.tool-btn{font-size:12px;padding:9px 7px}.modal{padding:10px}.modal-box{padding:16px}}
+</style>
+
+<style id="emergency-button-persistent-style">
+.station.emergency-active .btn-emergency {
+  background: #d90000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ff0000 !important;
+  box-shadow: 0 0 12px rgba(255,0,0,.9) !important;
+}
+.station.emergency-active {
+  border: 3px solid #ff0000 !important;
+  box-shadow: 0 0 16px #ff0000, 0 0 34px rgba(255,0,0,.75) !important;
+  animation: emergencyStationPulse 1.2s ease-in-out infinite !important;
+}
+@keyframes emergencyStationPulse {
+  0%,100% { box-shadow: 0 0 12px #ff0000, 0 0 26px rgba(255,0,0,.65); }
+  50% { box-shadow: 0 0 24px #ff0000, 0 0 44px rgba(255,0,0,.95); }
+}
+</style>
+
+
+<style id="emergency-two-stage-style">
+.btn-danger.emergency-arming,
+.station.emergency-active .btn-danger {
+  background:#d90000 !important;
+  color:#fff !important;
+  border-color:#ff0000 !important;
+  box-shadow:0 0 14px rgba(255,0,0,.95) !important;
+}
+.station.emergency-active {
+  border:3px solid #ff0000 !important;
+  animation: emergencyBorderFlash 0.9s ease-in-out infinite !important;
+}
+@keyframes emergencyBorderFlash {
+  0%,100% {
+    border-color:#ff0000;
+    box-shadow:0 0 8px rgba(255,0,0,.55), 0 0 18px rgba(255,0,0,.35);
+  }
+  50% {
+    border-color:#ff3b3b;
+    box-shadow:0 0 24px rgba(255,0,0,1), 0 0 46px rgba(255,0,0,.8);
+  }
+}
+</style>
+
+
+<style id="settings-connection-result-style">
+.settings-connection-result{
+  display:none;
+  margin-top:12px;
+  padding:11px 12px;
+  border-radius:9px;
+  border:1px solid #334155;
+  background:#0b1424;
+  font-size:13px;
+  line-height:1.45;
+}
+.settings-connection-result.show{display:flex;align-items:flex-start;gap:9px}
+.settings-connection-result.success{
+  border-color:#16a34a;
+  background:rgba(22,163,74,.10);
+  color:#86efac;
+}
+.settings-connection-result.error{
+  border-color:#dc2626;
+  background:rgba(220,38,38,.10);
+  color:#fca5a5;
+}
+.settings-connection-icon{
+  width:20px;height:20px;min-width:20px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-weight:900;
+}
+.settings-connection-result.success .settings-connection-icon{
+  background:#16a34a;color:#fff;
+}
+.settings-connection-result.error .settings-connection-icon{
+  background:#dc2626;color:#fff;
+}
+.settings-close-bottom{
+  width:100%;
+  margin-top:16px;
+  background:#334155;
+  color:#fff;
+  border:1px solid #475569;
+}
+.settings-close-bottom:hover{background:#475569}
+.settings-close-bottom:active{transform:translateY(1px)}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>IoT-Lab — Flood Monitoring Dashboard</h1>
+    <div class="muted">4 fixed ESP32 stations • Supabase • automatic polling every 1 second</div>
+  </div>
+  <div class="status"><span id="dot" class="dot"></span><span id="conn">Disconnected</span><span id="stationNetworkSummary" class="muted" style="margin-left:8px">ESP32: 0/4 ONLINE</span></div>
+</header>
+
+<div class="top-tools">
+  <button id="settingsBtn" class="tool-btn">⚙ Settings</button>
+  <button id="statusBtn" class="tool-btn">💡 Status</button>
+  <button id="thresholdBtn" class="tool-btn">⚙ Thresholds</button>
+</div>
+
+<div id="settingsModal" class="modal" aria-hidden="true">
+  <div class="modal-box">
+    <button class="modal-close" data-close="settingsModal">✕</button>
+    <h2>⚙ Settings</h2>
+    <label>Supabase Project URL</label>
+    <input id="url" value="https://srnghkvozbjuufpumaqf.supabase.co">
+    <label style="margin-top:10px">Publishable / anon key</label>
+    <input id="key" type="password" placeholder="Paste your public key">
+    <div class="modal-actions">
+      <button id="start">Connect / Start</button>
+      <button id="stop" style="background:#dc2626" disabled>Stop</button>
+    </div>
+    <div class="muted" id="updated" style="margin-top:10px">—</div>
+    <div id="settingsConnectionResult" class="settings-connection-result" role="status" aria-live="polite">
+      <span id="settingsConnectionIcon" class="settings-connection-icon">✓</span>
+      <div id="settingsConnectionText"></div>
+    </div>
+    <div class="muted note">Use only the Supabase publishable/anon key here. Never paste a service_role/secret key into this page.</div>
+    <button id="settingsCloseBottom" class="settings-close-bottom" type="button">Đóng</button>
+  </div>
+</div>
+
+<div id="statusModal" class="modal" aria-hidden="true">
+  <div class="modal-box">
+    <button class="modal-close" data-close="statusModal">✕</button>
+    <h2>💡 LED Status Meaning</h2>
+    <div class="muted status-help">
+      <span class="led green"></span> <b style="color:#4ade80">Blinking green</b> = value below warning threshold
+      <br><br>
+      <span class="led red"></span> <b style="color:#f87171">Blinking red</b> = value at/above warning threshold
+    </div>
+    <hr>
+    <h3>🚨 Emergency Control</h3>
+    <p class="muted">Emergency commands are sent only after you click the button. After sending, the dashboard waits for ESP32 acknowledgement; it does not mark the command as executed by itself.</p>
+    <button id="emergencyAll" class="emergency-all">🚨 HOLD 2s — MASTER EMERGENCY ALL STATIONS</button>
+    <div id="commandLog" class="muted" style="margin-top:10px">No commands sent yet.</div>
+  </div>
+</div>
+
+<div id="thresholdModal" class="modal" aria-hidden="true">
+  <div class="modal-box modal-wide">
+    <button class="modal-close" data-close="thresholdModal">✕</button>
+    <h2>⚙ Alert Thresholds</h2>
+    <p class="muted threshold-help">Each variable is evaluated independently: below Warning → blinking green; at/above Warning → blinking red.</p>
+    <div id="thresholds" class="threshold-grid"></div>
+  </div>
+</div>
+
+<div id="stations" class="grid"></div>
+
+
+
+<section class="panel">
+<h2>Water level history</h2>
+<canvas id="chart" width="1100" height="260"></canvas>
+<p class="muted">The chart uses the most recent readings returned by Supabase.</p>
+</section>
+
+<section class="panel">
+<h2>Latest records</h2>
+<table>
+<thead><tr><th>Time</th><th>Station</th><th>Water</th><th>Pressure</th><th>Flow</th><th>Temp</th><th>Humidity</th></tr></thead>
+<tbody id="records"></tbody>
+</table>
+</section>
+</div>
+
+<script>
+const zones={1:["S1","Drainage Zone"],2:["S2","Green Retention Zone"],3:["S3","Residential Zone"],4:["S4","Urban Industrial Zone"]};
+let timer=null;
+const $=id=>document.getElementById(id);
+
+function stationCard(id, d){
+  const [code,name]=zones[id];
+  const t=thresholdCache[id]||{
+    water_warning_cm:50,water_critical_cm:70,
+    flow_warning:5,flow_critical:8,
+    temperature_warning:35,temperature_critical:40,
+    humidity_warning:85,humidity_critical:95
+  };
+
+  const val=(field)=>d && d[field]!==null && d[field]!==undefined ? Number(d[field]) : null;
+  const water=val("water_level_cm"), flow=val("flow_rate"), temp=val("temperature_c"), hum=val("humidity_percent");
+
+  // Per-variable rule: below warning threshold = blinking green; at/above warning = blinking red.
+  const led=(value, warning)=>{
+    if(value===null || value===undefined || !Number.isFinite(Number(value))) return "gray";
+    if(warning===null || warning===undefined || warning==="" || !Number.isFinite(Number(warning))) return "gray";
+    return Number(value)>=Number(warning) ? "red" : "green";
+  };
+  const anyAlert =
+    (water!==null && water>=Number(t.water_warning_cm)) ||
+    (flow!==null && flow>=Number(t.flow_warning)) ||
+    (temp!==null && temp>=Number(t.temperature_warning)) ||
+    (hum!==null && hum>=Number(t.humidity_warning));
+
+  const stationClass=anyAlert ? "crit" : "";
+  const stationLabel=anyAlert ? "⚠ ALERT" : "● NORMAL";
+  const stateClass=anyAlert ? "alert" : "normal";
+
+  const metric=(label,value,unit,warning)=>{
+    const valid=value!==null && value!==undefined && Number.isFinite(Number(value));
+    const validWarning=warning!==null && warning!==undefined && warning!=="" && Number.isFinite(Number(warning));
+    const state=!valid ? "gray" : (!validWarning ? "gray" : (Number(value)>=Number(warning) ? "red" : "green"));
+    return `<div class="metric">
+      <small>${label}</small>
+      <b>${value===null?"—":value.toFixed(1)} ${unit}<span class="led ${state}" title="${state==="red"?"Above warning threshold":"Below warning threshold"}"></span></b>
+      <small>Warning: ${warning}</small>
+    </div>`;
+  };
+
+  const emergencyActive=!!emergencyStations[id];
+  const stationInfo=stationStatusCache[id]||null;
+  const connection=getStationConnectionStatus(stationInfo?.last_seen);
+  return `<div class="station ${stationClass}${emergencyActive?' emergency-active':''}" id="station-card-${id}" data-connection-state="${connection.state}">
+    <div class="station-head">
+      <div>
+        <h2>${code}</h2><div class="zone">${name}</div>
+        <div class="station-connection">
+          <span class="connection-dot ${connection.className}"></span>
+          <b class="connection-label ${connection.className}">${connection.state}</b>
+          <span class="station-heartbeat-age">• ${formatHeartbeatAge(stationInfo?.last_seen)}</span>
+        </div>
+      </div>
+      <div class="station-state ${stateClass}">${stationLabel}</div>
+    </div>
+    <div class="big">${water===null?"—":water.toFixed(1)}</div>
+    <div class="unit">water level (cm)<span class="led ${led(water,t.water_warning_cm)}"></span></div>
+    <div class="metrics">
+      ${metric("Pressure",d?Number(d.pressure_kpa):null,"kPa","—")}
+      ${metric("Flow",flow,"",t.flow_warning)}
+      ${metric("Temperature",temp,"°C",t.temperature_warning)}
+      ${metric("Humidity",hum,"%",t.humidity_warning)}
+    </div>
+    <div class="controls">
+      <button class="btn-danger" onclick="sendCommand(${id},'EMERGENCY','ON')">🚨 Emergency</button>
+      <button class="btn-reset" onclick="resetStation(${id})">↺ Reset</button>
+    </div>
+    <div id="cmd-${id}" class="command-status">No command sent.</div>
+    <div class="muted" style="margin-top:9px">Last data: ${d?new Date(d.created_at).toLocaleString():"No data"}</div>
+  </div>`;
+}
+function drawChart(rows){
+  const c=$("chart"),ctx=c.getContext("2d"),w=c.width,h=c.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle="#26364d";ctx.fillStyle="#94a3b8";ctx.font="12px system-ui";
+  for(let i=0;i<=4;i++){let y=25+i*(h-50)/4;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-15,y);ctx.stroke()}
+  const vals=rows.map(r=>Number(r.water_level_cm)).filter(Number.isFinite);
+  if(!vals.length){ctx.fillText("No data",50,60);return}
+  const max=Math.max(50,...vals),min=Math.min(0,...vals);
+  ctx.fillText(max.toFixed(0)+" cm",5,28);ctx.fillText(min.toFixed(0)+" cm",5,h-20);
+  const by={1:[],2:[],3:[],4:[]};
+  rows.slice().reverse().forEach(r=>{if(by[r.station_id])by[r.station_id].push(r)});
+  const series=[1,2,3,4];
+  series.forEach((id,si)=>{
+    const a=by[id]; if(!a.length)return;
+    ctx.beginPath();
+    a.forEach((r,i)=>{
+      const x=55+i*Math.max(1,(w-75)/Math.max(1,a.length-1));
+      const y=25+(max-Number(r.water_level_cm))/(max-min)*(h-50);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle=["#38bdf8","#4ade80","#fbbf24","#f87171"][si];
+    ctx.lineWidth=2;ctx.stroke();
+  });
+}
+let thresholdCache={};
+let emergencyStations={};
+let commandTimer=null;
+
+let stationStatusCache={};
+
+function getStationConnectionStatus(lastSeen){
+  // Source of truth: heartbeat timestamp from stations.last_seen.
+  // Never use stations.status or Dashboard/Supabase connection state to declare an ESP32 online.
+  if(!lastSeen)return {state:"OFFLINE",className:"offline",ageSeconds:Infinity};
+  const last=Date.parse(lastSeen);
+  if(!Number.isFinite(last))return {state:"OFFLINE",className:"offline",ageSeconds:Infinity};
+  const ageSeconds=Math.max(0,(Date.now()-last)/1000);
+  if(ageSeconds<=25)return {state:"ONLINE",className:"online",ageSeconds};
+  if(ageSeconds<=30)return {state:"UNSTABLE",className:"unstable",ageSeconds};
+  return {state:"OFFLINE",className:"offline",ageSeconds};
+}
+
+function formatHeartbeatAge(lastSeen){
+  if(!lastSeen)return "No heartbeat";
+  const last=Date.parse(lastSeen);
+  if(!Number.isFinite(last))return "No heartbeat";
+  const s=Math.max(0,Math.floor((Date.now()-last)/1000));
+  if(s<2)return "just now";
+  if(s<60)return `${s}s ago`;
+  const m=Math.floor(s/60);
+  if(m<60)return `${m}m ago`;
+  return `${Math.floor(m/60)}h ago`;
+}
+
+function updateStationConnectionUI(){
+  [1,2,3,4].forEach(id=>{
+    const station=stationStatusCache[id];
+    const info=getStationConnectionStatus(station?.last_seen);
+    const card=$("station-card-"+id);
+    if(!card)return;
+    const dot=card.querySelector(".connection-dot");
+    const label=card.querySelector(".connection-label");
+    const age=card.querySelector(".station-heartbeat-age");
+    if(dot)dot.className=`connection-dot ${info.className}`;
+    if(label){
+      label.textContent=info.state;
+      label.className=`connection-label ${info.className}`;
+    }
+    if(age)age.textContent=`• ${formatHeartbeatAge(station?.last_seen)}`;
+    card.dataset.connectionState=info.state;
+  });
+
+  const states=[1,2,3,4].map(id=>getStationConnectionStatus(stationStatusCache[id]?.last_seen).state);
+  const online=states.filter(s=>s==="ONLINE").length;
+  const unstable=states.filter(s=>s==="UNSTABLE").length;
+  const offline=4-online-unstable;
+  const summary=$("stationNetworkSummary");
+  if(summary){
+    summary.textContent=`ESP32: ${online}/4 ONLINE`+
+      (unstable?` • ${unstable} UNSTABLE`:"")+
+      (offline?` • ${offline} OFFLINE`:"");
+  }
+}
+
+async function apiFetch(path, options={}){
+  const base=$("url").value.trim().replace(/\/+$/,""),key=$("key").value.trim();
+  if(!key)throw new Error("Please enter the publishable/anon key.");
+  const headers={
+    "apikey":key,
+    "Authorization":"Bearer "+key,
+    "Content-Type":"application/json",
+    ...(options.headers||{})
+  };
+  const res=await fetch(base+"/rest/v1/"+path,{...options,headers});
+  if(!res.ok)throw new Error(res.status+" "+res.statusText+" — "+await res.text());
+  return res;
+}
+
+async function fetchThresholds(){
+  const res=await apiFetch("alert_thresholds?select=*&order=station_id.asc");
+  const rows=await res.json();
+  thresholdCache={};
+  rows.forEach(r=>thresholdCache[r.station_id]=r);
+  return rows;
+}
+
+function renderThresholds(rows){
+  $("thresholds").innerHTML=rows.map(r=>`
+    <div class="threshold-card">
+      <h3 style="margin:0 0 10px">S${r.station_id}</h3>
+      <label>Water Warning (cm)<input id="tw-${r.station_id}" type="number" step="0.1" value="${r.water_warning_cm}"></label>
+      <label>Water Critical (cm)<input id="tc-${r.station_id}" type="number" step="0.1" value="${r.water_critical_cm}"></label>
+      <label>Flow Warning<input id="fw-${r.station_id}" type="number" step="0.1" value="${r.flow_warning}"></label>
+      <label>Flow Critical<input id="fc-${r.station_id}" type="number" step="0.1" value="${r.flow_critical}"></label>
+      <label>Temp Warning (°C)<input id="tempw-${r.station_id}" type="number" step="0.1" value="${r.temperature_warning}"></label>
+      <label>Temp Critical (°C)<input id="tempc-${r.station_id}" type="number" step="0.1" value="${r.temperature_critical}"></label>
+      <label>Humidity Warning (%)<input id="hw-${r.station_id}" type="number" step="0.1" value="${r.humidity_warning}"></label>
+      <label>Humidity Critical (%)<input id="hc-${r.station_id}" type="number" step="0.1" value="${r.humidity_critical}"></label>
+      <button class="btn-success" style="width:100%" onclick="saveThreshold(${r.station_id})">💾 Save S${r.station_id}</button>
+      <div id="th-status-${r.station_id}" class="command-status"></div>
+    </div>`).join("");
+}
+
+async function saveThreshold(id){
+  const get=n=>Number($(n+id).value);
+  const vals={
+    water_warning_cm:get("tw-"), water_critical_cm:get("tc-"),
+    flow_warning:get("fw-"), flow_critical:get("fc-"),
+    temperature_warning:get("tempw-"), temperature_critical:get("tempc-"),
+    humidity_warning:get("hw-"), humidity_critical:get("hc-"),
+    updated_at:new Date().toISOString()
+  };
+  if(vals.water_warning_cm>=vals.water_critical_cm ||
+     vals.flow_warning>=vals.flow_critical ||
+     vals.temperature_warning>=vals.temperature_critical ||
+     vals.humidity_warning>=vals.humidity_critical){
+    $("th-status-"+id).textContent="Warning value must be lower than Critical value.";
+    $("th-status-"+id).className="command-status error";
+    return;
+  }
+  try{
+    await apiFetch("alert_thresholds?station_id=eq."+id,{
+      method:"PATCH",body:JSON.stringify(vals),headers:{"Prefer":"return=minimal"}
+    });
+    thresholdCache[id]={...(thresholdCache[id]||{}),...vals};
+    $("th-status-"+id).textContent="Saved successfully.";
+    $("th-status-"+id).className="command-status executed";
+    const panel=$("thresholdPanel"), toggle=$("thresholdToggle");
+    if(panel && toggle){
+      panel.classList.remove("open");
+      toggle.textContent="⚙ Alert Thresholds — Show";
+    }
+    await refresh();
+  }catch(e){
+    $("th-status-"+id).textContent=e.message;
+    $("th-status-"+id).className="command-status error";
+  }
+}
+
+async function sendCommand(stationId,command,value){
+  const el=$("cmd-"+stationId);
+  const label = value==="ON" ? "Emergency ON" : "Reset / OFF";
+
+  // Nothing is sent until the user explicitly clicks the button.
+  el.textContent="Sending...";
+  el.className="command-status pending";
+
+  try{
+    await apiFetch("device_commands",{
+      method:"POST",
+      body:JSON.stringify({station_id:stationId,command,value}),
+      headers:{"Prefer":"return=minimal"}
+    });
+
+    // The command has been successfully written to Supabase.
+    // It is NOT marked "executed" until the ESP32 acknowledges it.
+    el.textContent=`✓ ${label} sent`;
+    el.className="command-status sent";
+    if(command==="EMERGENCY" && value==="ON"){
+      emergencyStations[stationId]=true;
+      const card=$("station-card-"+stationId);
+      if(card) card.classList.add("emergency-active");
+      $("commandLog").textContent=`🚨 S${stationId}: EMERGENCY ACTIVE at ${new Date().toLocaleTimeString()} — waiting for ESP32`;
+    }else{
+      if(command==="EMERGENCY" && value==="OFF"){
+        delete emergencyStations[stationId];
+        const card=$("station-card-"+stationId);
+        if(card) card.classList.remove("emergency-active");
+      }
+      $("commandLog").textContent=`✓ S${stationId}: ${label} sent at ${new Date().toLocaleTimeString()} — waiting for ESP32`;
+    }
+  }catch(e){
+    el.textContent="Command error: "+e.message;
+    el.className="command-status error";
+  }
+}
+async function resetStation(stationId){
+  const card=document.getElementById("station-card-"+stationId);
+  const btn=card?.querySelector(".btn-reset");
+  const emergencyBtn=card?.querySelector(".btn-danger");
+  if(btn) btn.classList.add("resetting");
+  try{
+    await sendCommand(stationId,"EMERGENCY","OFF");
+    if(emergencyBtn) emergencyBtn.classList.remove("emergency-arming");
+    delete emergencyStations[stationId];
+    const card=$("station-card-"+stationId);
+    if(card) card.classList.remove("emergency-active");
+    $("commandLog").textContent=`🟢 S${stationId}: RESET sent at ${new Date().toLocaleTimeString()} — only S${stationId} was reset`;
+  }finally{
+    setTimeout(()=>{ if(btn) btn.classList.remove("resetting"); },650);
+  }
+}
+
+async function emergencyAll(){
+  const ok=confirm("Send MASTER EMERGENCY to S1, S2, S3 and S4?");
+  if(!ok)return;
+
+  $("commandLog").textContent="Sending MASTER EMERGENCY to S1–S4...";
+  try{
+    await Promise.all([1,2,3,4].map(id=>sendCommand(id,"EMERGENCY","ON")));
+    document.body.classList.add("emergency-active");
+    $("commandLog").textContent="🚨 MASTER EMERGENCY commands sent to S1–S4 at "+new Date().toLocaleTimeString()+" — waiting for ESP32";
+  }catch(e){
+    $("commandLog").textContent="Emergency error: "+e.message;
+  }
+}
+
+
+async function fetchLatestCommands(){
+  // Read only EMERGENCY commands. The newest EMERGENCY command for each station
+  // is the source of truth for the persistent Emergency visual state.
+  const res=await apiFetch("device_commands?select=id,station_id,command,value,status,created_at,executed_at&command=eq.EMERGENCY&order=created_at.desc&limit=100");
+  const rows=await res.json();
+  const latest={};
+  rows.forEach(r=>{
+    const id=Number(r.station_id);
+    if(!latest[id]) latest[id]=r;
+  });
+  [1,2,3,4].forEach(id=>{
+    const r=latest[id];
+    if(!r) return;
+    const active=String(r.value).toUpperCase()==="ON";
+    if(active) emergencyStations[id]=true;
+    else delete emergencyStations[id];
+  });
+  return latest;
+}
+
+async function fetchStations(){
+  const res=await apiFetch("stations?select=id,station_code,status,last_seen&order=id.asc");
+  const rows=await res.json();
+  stationStatusCache={};
+  [1,2,3,4].forEach(id=>{
+    stationStatusCache[id]={id,station_code:`S${id}`,status:"offline",last_seen:null};
+  });
+  rows.forEach(r=>stationStatusCache[r.id]=r);
+  return rows;
+}
+
+async function fetchRows(){
+  const base=$("url").value.trim().replace(/\/+$/,""),key=$("key").value.trim();
+  if(!key)throw new Error("Please enter the publishable/anon key.");
+  const u=base+"/rest/v1/sensor_readings?select=*&order=created_at.desc&limit=100";
+  const res=await fetch(u,{headers:{"apikey":key,"Authorization":"Bearer "+key}});
+  if(!res.ok)throw new Error(res.status+" "+res.statusText+" — "+await res.text());
+  return await res.json();
+}
+async function refresh(){
+  try{
+    const [rows,stationRows,thresholds]=await Promise.all([
+      fetchRows(),
+      fetchStations(),
+      fetchThresholds(),
+      fetchLatestCommands()
+    ]);
+    const thresholdIds=thresholds.map(x=>x.station_id).join(",");
+    if($("thresholds") && $("thresholds").dataset.ids!==thresholdIds){
+      renderThresholds(thresholds);
+      $("thresholds").dataset.ids=thresholdIds;
+    }
+    const latest={};
+    rows.forEach(r=>{if(!latest[r.station_id])latest[r.station_id]=r});
+    $("stations").innerHTML=[1,2,3,4].map(id=>stationCard(id,latest[id])).join("");
+    setupEmergencyHold();
+    if(window.restoreEmergencyVisuals) window.restoreEmergencyVisuals();
+    updateStationConnectionUI();
+    $("records").innerHTML=rows.slice(0,20).map(r=>`<tr>
+      <td>${new Date(r.created_at).toLocaleTimeString()}</td><td>${zones[r.station_id]?.[0]||r.station_id}</td>
+      <td>${r.water_level_cm} cm</td><td>${r.pressure_kpa}</td><td>${r.flow_rate}</td>
+      <td>${r.temperature_c} °C</td><td>${r.humidity_percent} %</td></tr>`).join("");
+    drawChart(rows);
+    $("dot").className="dot ok";$("conn").textContent="Connected";
+    $("updated").textContent="Updated "+new Date().toLocaleTimeString();
+  }catch(e){
+    $("dot").className="dot bad";$("conn").textContent="Error";
+    $("updated").textContent=e.message;
+  }
+}
+function showSettingsConnectionResult(success, message){
+  const box=$("settingsConnectionResult");
+  const icon=$("settingsConnectionIcon");
+  const text=$("settingsConnectionText");
+  if(!box||!icon||!text)return;
+
+  box.className="settings-connection-result show "+(success?"success":"error");
+  icon.textContent=success?"✓":"!";
+  text.innerHTML=success
+    ? "<b>Kết nối thành công</b><br>"+message
+    : "<b>Kết nối thất bại</b><br>"+message;
+}
+
+$("start").onclick=async()=>{
+  if(timer)return;
+
+  $("start").disabled=true;
+  $("stop").disabled=false;
+  $("updated").textContent="Đang kiểm tra kết nối…";
+
+  try{
+    await refresh();
+
+    // refresh() can render a dashboard error state without throwing.
+    // Verify the main connection indicator before declaring success.
+    const connected=$("conn")?.textContent==="Connected";
+    if(!connected){
+      throw new Error($("updated")?.textContent || "Không thể kết nối Supabase.");
+    }
+
+    timer=setInterval(refresh,1000);
+    showSettingsConnectionResult(
+      true,
+      "Supabase đã kết nối. Dashboard đang tự động cập nhật dữ liệu."
+    );
+  }catch(e){
+    $("start").disabled=false;
+    $("stop").disabled=true;
+    showSettingsConnectionResult(false,e.message||"Không thể kết nối Supabase.");
+  }
+};
+
+$("settingsCloseBottom").onclick=()=>{
+  closeModal("settingsModal");
+};
+$("stop").onclick=()=>{
+  clearInterval(timer);timer=null;$("start").disabled=false;$("stop").disabled=true;
+  $("dot").className="dot";$("conn").textContent="Stopped";
+  showSettingsConnectionResult(false,"Đã dừng kết nối và polling dữ liệu.");
+};
+
+function attachEmergencyHold(button, action){
+  let timer=null;
+  let fired=false;
+
+  const restoreButton=()=>{
+    if(timer){ clearTimeout(timer); timer=null; }
+    if(!fired) button.classList.remove("emergency-arming");
+    fired=false;
+  };
+
+  button.addEventListener("pointerdown", e=>{
+    e.preventDefault();
+    button.setPointerCapture?.(e.pointerId);
+
+    // Stage 1: button turns red immediately while waiting for 2 seconds.
+    fired=false;
+    button.classList.add("emergency-arming");
+
+    timer=setTimeout(async()=>{
+      fired=true;
+      timer=null;
+
+      if(navigator.vibrate) navigator.vibrate([120,80,120]);
+
+      // Stage 2: send the actual command. sendCommand() then activates
+      // the station's persistent red emergency state after Supabase accepts it.
+      await action();
+
+      // Keep the Emergency button red until Reset.
+      button.classList.add("emergency-arming");
+    },2000);
+  });
+
+  ["pointerup","pointercancel","pointerleave"].forEach(evt=>{
+    button.addEventListener(evt,()=>{
+      // Releasing before 2 seconds cancels the emergency and restores the button.
+      if(!fired) restoreButton();
+    });
+  });
+}
+
+function setupEmergencyHold(){
+  // Station Emergency is an immediate action. No 2-second hold.
+  document.querySelectorAll(".btn-danger").forEach(btn=>{
+    const m=btn.getAttribute("onclick")?.match(/sendCommand\((\d+),'EMERGENCY','ON'\)/);
+    if(m){
+      btn.removeAttribute("onclick");
+      const stationId=Number(m[1]);
+      btn.onclick=()=>sendCommand(stationId,"EMERGENCY","ON");
+    }
+  });
+  // Master Emergency keeps the original 2-second hold safety behavior.
+  const master=$("emergencyAll");
+  if(master){
+    master.onclick=null;
+    attachEmergencyHold(master,emergencyAll);
+  }
+}
+function openModal(id){
+  const m=$(id); if(!m)return;
+  m.classList.add("open"); m.setAttribute("aria-hidden","false");
+}
+function closeModal(id){
+  const m=$(id); if(!m)return;
+  m.classList.remove("open"); m.setAttribute("aria-hidden","true");
+}
+function setupModals(){
+  $("settingsBtn").onclick=()=>openModal("settingsModal");
+  $("statusBtn").onclick=()=>openModal("statusModal");
+  $("thresholdBtn").onclick=()=>openModal("thresholdModal");
+  document.querySelectorAll(".modal-close").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{
+    if(e.target===m) closeModal(m.id);
+  }));
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape") document.querySelectorAll(".modal.open").forEach(m=>closeModal(m.id));
+  });
+}
+
+setupEmergencyHold();
+setupModals();
+[1,2,3,4].forEach(id=>{$("stations").insertAdjacentHTML("beforeend",stationCard(id,null))});
+setInterval(updateStationConnectionUI,1000);
+</script>
+
+<script id="persistent-emergency-final">
+(function () {
+  window.emergencyStations = window.emergencyStations || {};
+
+  function getCard(id) {
+    return document.getElementById("station-card-" + id);
+  }
+
+  function setEmergencyVisual(id, active) {
+    const card = getCard(id);
+    if (!card) return;
+
+    card.classList.toggle("emergency-active", active);
+
+    const btn = card.querySelector(".btn-danger");
+    if (btn) {
+      btn.classList.toggle("emergency-button-active", active);
+      if (active) {
+        btn.style.background = "#d90000";
+        btn.style.color = "#fff";
+        btn.style.borderColor = "#ff0000";
+        btn.style.boxShadow = "0 0 14px rgba(255,0,0,.95)";
+      } else {
+        btn.style.background = "";
+        btn.style.color = "";
+        btn.style.borderColor = "";
+        btn.style.boxShadow = "";
+      }
+    }
+  }
+
+  window.keepEmergencyRed = function (stationId) {
+    window.emergencyStations[stationId] = true;
+    setEmergencyVisual(stationId, true);
+  };
+
+  window.clearEmergencyRed = function (stationId) {
+    window.emergencyStations[stationId] = false;
+    setEmergencyVisual(stationId, false);
+
+    const card = getCard(stationId);
+    if (card) {
+      const reset = card.querySelector(".btn-reset");
+      if (reset) {
+        reset.classList.add("resetting");
+        setTimeout(() => reset.classList.remove("resetting"), 700);
+      }
+    }
+  };
+
+  // Re-apply active state after dashboard refresh/render.
+  window.restoreEmergencyVisuals = function () {
+    Object.keys(window.emergencyStations).forEach(id => {
+      if (window.emergencyStations[id]) setEmergencyVisual(id, true);
+    });
+  };
+
+  // Capture clicks on Emergency/Reset without changing the existing V8 layout.
+  document.addEventListener("click", function (e) {
+
+    const reset = e.target.closest(".btn-reset");
+    if (reset) {
+      const card = reset.closest(".station");
+      if (!card) return;
+      const m = card.id.match(/station-card-(\d+)/);
+      if (m) clearEmergencyRed(m[1]);
+    }
+  }, true);
+
+  // Restore after initial rendering.
+  window.addEventListener("load", () => {
+    setTimeout(restoreEmergencyVisuals, 150);
+    setTimeout(restoreEmergencyVisuals, 800);
+  });
+})();
+</script>
+
+</body>
+</html>

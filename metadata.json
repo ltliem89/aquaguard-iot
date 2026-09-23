@@ -1,0 +1,6 @@
+{
+  "name": "IoT-Lab — Flood Monitoring Dashboard",
+  "description": "4 fixed ESP32 stations flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

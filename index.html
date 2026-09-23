@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>IoT-Lab — Flood Monitoring Dashboard</title>
+  <meta name="description" content="4 fixed ESP32 stations flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
+  <meta name="theme-color" content="#08111f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="IoT-Lab">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
+  
+  <meta property="og:title" content="IoT-Lab — Flood Monitoring Dashboard">
+  <meta property="og:description" content="4 fixed ESP32 stations flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>IoT-Lab — Flood Monitoring Dashboard</h1>
+        <div class="muted">4 fixed ESP32 stations • Supabase • automatic polling every 1 second</div>
+      </div>
+      <div class="status">
+        <span id="dot" class="dot"></span>
+        <span id="conn">Disconnected</span>
+        <span id="stationNetworkSummary" class="muted" style="margin-left:8px">ESP32: 0/4 ONLINE</span>
+      </div>
+    </header>
+
+    <div class="top-tools">
+      <button id="settingsBtn" class="tool-btn">⚙ Settings</button>
+      <button id="statusBtn" class="tool-btn">💡 Status</button>
+      <button id="thresholdBtn" class="tool-btn">⚙ Thresholds</button>
+      <button id="pwaInstallBtn" class="pwa-install-btn" style="display:none">📥 Cài đặt PWA</button>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" aria-hidden="true">
+      <div class="modal-box">
+        <button class="modal-close" data-close="settingsModal" aria-label="Đóng">✕</button>
+        <h2>⚙ Settings</h2>
+        <label for="url">Supabase Project URL</label>
+        <input id="url" value="https://srnghkvozbjuufpumaqf.supabase.co">
+        <label for="key" style="margin-top:10px">Publishable / anon key</label>
+        <input id="key" type="password" placeholder="Paste your public key">
+        <div class="modal-actions">
+          <button id="start">Connect / Start</button>
+          <button id="stop" style="background:#dc2626" disabled>Stop</button>
+        </div>
+        <div class="muted" id="updated" style="margin-top:10px">—</div>
+        <div id="settingsConnectionResult" class="settings-connection-result" role="status" aria-live="polite">
+          <span id="settingsConnectionIcon" class="settings-connection-icon">✓</span>
+          <div id="settingsConnectionText"></div>
+        </div>
+        <div class="muted note">Use only the Supabase publishable/anon key here. Never paste a service_role/secret key into this page.</div>
+        <button id="settingsCloseBottom" class="settings-close-bottom" type="button">Đóng</button>
+      </div>
+    </div>
+
+    <!-- Status Modal -->
+    <div id="statusModal" class="modal" aria-hidden="true">
+      <div class="modal-box">
+        <button class="modal-close" data-close="statusModal" aria-label="Đóng">✕</button>
+        <h2>💡 LED Status Meaning</h2>
+        <div class="muted status-help">
+          <span class="led green"></span> <b style="color:#4ade80">Blinking green</b> = value below warning threshold
+          <br><br>
+          <span class="led red"></span> <b style="color:#f87171">Blinking red</b> = value at/above warning threshold
+        </div>
+        <hr>
+        <h3>🚨 Emergency Control</h3>
+        <p class="muted">Emergency commands are sent only after you click the button. After sending, the dashboard waits for ESP32 acknowledgement; it does not mark the command as executed by itself.</p>
+        <button id="emergencyAll" class="emergency-all">🚨 HOLD 2s — MASTER EMERGENCY ALL STATIONS</button>
+        <div id="commandLog" class="muted" style="margin-top:10px">No commands sent yet.</div>
+      </div>
+    </div>
+
+    <!-- Threshold Modal -->
+    <div id="thresholdModal" class="modal" aria-hidden="true">
+      <div class="modal-box modal-wide">
+        <button class="modal-close" data-close="thresholdModal" aria-label="Đóng">✕</button>
+        <h2>⚙ Alert Thresholds</h2>
+        <p class="muted threshold-help">Each variable is evaluated independently: below Warning → blinking green; at/above Warning → blinking red.</p>
+        <div id="thresholds" class="threshold-grid"></div>
+      </div>
+    </div>
+
+    <!-- 4 Station Cards Grid -->
+    <div id="stations" class="grid"></div>
+
+    <!-- Water Level History Canvas Chart -->
+    <section class="panel">
+      <h2>Water level history</h2>
+      <canvas id="chart" width="1100" height="260"></canvas>
+      <p class="muted">The chart uses the most recent readings returned by Supabase.</p>
+    </section>
+
+    <!-- Latest Records Table -->
+    <section class="panel">
+      <h2>Latest records</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Station</th>
+            <th>Water</th>
+            <th>Pressure</th>
+            <th>Flow</th>
+            <th>Temp</th>
+            <th>Humidity</th>
+          </tr>
+        </thead>
+        <tbody id="records"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- Offline Banner Indicator -->
+  <div id="offlineBanner" class="offline-banner" role="alert">
+    <span>⚠️ Mất kết nối Internet — đang hiển thị dữ liệu đã lưu gần nhất.</span>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
