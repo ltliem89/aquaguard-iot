@@ -177,8 +177,14 @@ export function initApp() {
     updateStationConnectionUI(getStationStatusCache());
   }, 1000);
 
-  // Auto-connect if anon key is already provided via .env or localStorage
+  // Populate input fields with active config
   const config = getSupabaseConfig();
+  const urlInput = document.getElementById('url');
+  const keyInput = document.getElementById('key');
+  if (urlInput && config.url) urlInput.value = config.url;
+  if (keyInput && config.key) keyInput.value = config.key;
+
+  // Auto-connect if anon key is already provided via .env, default, or localStorage
   if (config.key) {
     const startBtn = document.getElementById('start');
     if (startBtn) startBtn.click();

@@ -17,9 +17,9 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: '/',
-          name: 'IoT-Lab — Flood Monitoring Dashboard',
+          name: 'IoT-Lab — Flood Monitoring',
           short_name: 'IoT-Lab',
-          description: '4 fixed ESP32 stations flood monitoring dashboard with Supabase',
+          description: 'Flood monitoring dashboard with Supabase',
           theme_color: '#08111f',
           background_color: '#08111f',
           display: 'standalone',

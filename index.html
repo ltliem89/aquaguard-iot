@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>IoT-Lab — Flood Monitoring Dashboard</title>
-  <meta name="description" content="4 fixed ESP32 stations flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
+  <title>IoT-Lab — Flood Monitoring</title>
+  <meta name="description" content="Flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
   <meta name="theme-color" content="#08111f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,8 +15,8 @@
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="alternate icon" href="/favicon.ico">
   
-  <meta property="og:title" content="IoT-Lab — Flood Monitoring Dashboard">
-  <meta property="og:description" content="4 fixed ESP32 stations flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
+  <meta property="og:title" content="IoT-Lab — Flood Monitoring">
+  <meta property="og:description" content="Flood monitoring dashboard with Supabase, emergency control, alert thresholds, and real-time PWA telemetry.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
 </head>
@@ -24,8 +24,7 @@
   <div class="wrap">
     <header>
       <div>
-        <h1>IoT-Lab — Flood Monitoring Dashboard</h1>
-        <div class="muted">4 fixed ESP32 stations • Supabase • automatic polling every 1 second</div>
+        <h1>IoT-Lab — Flood Monitoring</h1>
       </div>
       <div class="status">
         <span id="dot" class="dot"></span>
@@ -49,7 +48,7 @@
         <label for="url">Supabase Project URL</label>
         <input id="url" value="https://srnghkvozbjuufpumaqf.supabase.co">
         <label for="key" style="margin-top:10px">Publishable / anon key</label>
-        <input id="key" type="password" placeholder="Paste your public key">
+        <input id="key" type="password" placeholder="Paste your public key" value="sb_publishable_kQOCHG9Ug6NUpjCwfk-l0g_wotfR_tg">
         <div class="modal-actions">
           <button id="start">Connect / Start</button>
           <button id="stop" style="background:#dc2626" disabled>Stop</button>

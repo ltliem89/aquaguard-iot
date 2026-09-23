@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "IoT-Lab — Flood Monitoring Dashboard",
+  "name": "IoT-Lab — Flood Monitoring",
   "short_name": "IoT-Lab",
-  "description": "4 fixed ESP32 stations flood monitoring dashboard with Supabase",
+  "description": "Flood monitoring dashboard with Supabase",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

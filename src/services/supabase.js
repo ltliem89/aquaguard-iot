@@ -10,7 +10,7 @@ const STORAGE_URL_KEY = 'iot_supabase_url';
 const STORAGE_ANON_KEY = 'iot_supabase_key';
 
 const DEFAULT_URL = import.meta.env.VITE_SUPABASE_URL || 'https://srnghkvozbjuufpumaqf.supabase.co';
-const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_kQOCHG9Ug6NUpjCwfk-l0g_wotfR_tg';
 
 export function getSupabaseConfig() {
   const storedUrl = localStorage.getItem(STORAGE_URL_KEY);
